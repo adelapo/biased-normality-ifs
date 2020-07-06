@@ -15,7 +15,7 @@ PImage measureImage;
 
 int numIterations = 1000000;
 
-boolean useGenerator = false;
+boolean useGenerator = true;
 
 // Pan and zoom variables
 float zoomScale = 1;
@@ -54,11 +54,10 @@ void setup() {
   SampleGenerators generators = new SampleGenerators();
   
   // Set the iterated function system here
-  IFS = sampleIFS.new BarnsleyFern();
+  IFS = sampleIFS.new Square();
   
   // Set the generator here (used only when useGenerator is true)
-  Generator generator = generators.new BiasedNormal(new int[]{1, 2, 3, 4},
-                                                    new int[]{10, 10, 10, 10}); //<>//
+  Generator generator = generators.new CopelandErdos(IFS.size); //<>//
   
   print("Computing fractal... ");
   
