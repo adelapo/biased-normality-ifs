@@ -1,5 +1,5 @@
 from tkinter import PhotoImage
-from example_generators import base_repr
+from example_generators import base_repr, int
 
 
 # From https://en.wikipedia.org/wiki/HSL_and_HSV#HSV_to_RGB_alternative
@@ -23,11 +23,11 @@ class Coordinate:
 
 class AffineTransformation:
     """
-     _      _  _ _       _   _
-    | a    b || x |     |  e  |
-    |        ||   |  +  |     |
-    | c    d || y |     |  f  |
-     -      -  - -       -   -
+     _      _  _ _       _   _      _           _
+    | a    b || x |     |  e  |    | ax + by + e |
+    |        ||   |  +  |     |  = |             |
+    | c    d || y |     |  f  |    | cx + dy + f |
+     -      -  - -       -   -      -           -
      
     """
     def __init__(self, a, b, c, d, e, f):
@@ -43,6 +43,9 @@ class AffineTransformation:
         new_y = self.c * coord.x + self.d * coord.y + self.f
 
         return Coordinate(new_x, new_y)
+
+    def as_array(self):
+        return [self.a, self.b, self.c, self.d, self.e, self.f]
 
 
 class IteratedFunctionSystem:
@@ -94,6 +97,8 @@ class IteratedFunctionSystem:
         for pt, index in zip(all_points, all_transformations):
             new_x = ((pt.x - min_x) / fractal_size) * image_width
             new_y = ((pt.y - min_y) / fractal_size) * image_height
+
+            new_y = image_height - new_y
 
             drawn_points.append(Coordinate(new_x, new_y))
             draw_colors.append(hsv_to_rgb(index * 360 / self.size, 1, 1))

@@ -1,21 +1,26 @@
 import tkinter.filedialog
 import tkinter as tk
-from example_generators import *
+import tkinter.font
 from ifs_classes import *
 
 import examples
+from example_generators import lcm, int, digits
+import example_generators
 
 IMAGE_WIDTH = 600
 IMAGE_HEIGHT = 600
 
 root = tk.Tk()
 
+tk.font.nametofont("TkDefaultFont").config(family="Consolas", size=12)
+tk.font.nametofont("TkTextFont").config(family="Consolas", size=12)
+
 
 # Adapted from https://blog.tecladocode.com/tkinter-scrollable-frames/
 class ScrollableLabelFrame(tk.Frame):
     def __init__(self, container, *args, **kwargs):
         super().__init__(container, *args, **kwargs)
-        canvas = tk.Canvas(self, height=150)
+        canvas = tk.Canvas(self, height=150, highlightthickness=0)
         self.canvas = canvas
 
         scrollbar = tk.Scrollbar(self, orient="vertical", command=canvas.yview)
@@ -44,15 +49,15 @@ class TransformationsFrame(tk.LabelFrame):
         self.parent = parent
 
         self.num_selector_frame = tk.Frame(self)
-        self.num_selector_frame.pack()
+        self.num_selector_frame.pack(pady=(0, 10))
 
         self.num_selector_label = tk.Label(self.num_selector_frame, text="Number of transformations:")
         self.num_selector_label.grid(row=1, column=1)
 
         self.num_selector_entry = tk.Entry(self.num_selector_frame, width=4)
-        self.num_selector_entry.grid(row=1, column=2)
+        self.num_selector_entry.grid(row=1, column=2, padx=10)
 
-        self.num_selector_entry.insert(0, "3")
+        self.num_selector_entry.insert(0, "4")
 
         self.transformation_entries = []
 
@@ -67,7 +72,22 @@ class TransformationsFrame(tk.LabelFrame):
         self.num_selected()
 
     def num_selected(self):
-        num = int(self.num_selector_entry.get())
+        try:
+            num = int(self.num_selector_entry.get())
+        except ValueError as err:
+            error_message("The number of transformations selected, "
+                          + self.num_selector_entry.get() + ", is invalid.")
+            return
+
+        if num > len(digits):
+            error_message("The number of transformations selected, "
+                          + self.num_selector_entry.get() + ", must not be greater than " + str(len(digits)) + ".")
+            return
+
+        if num < 1:
+            error_message("The number of transformations selected, "
+                          + self.num_selector_entry.get() + ", must not be less than 1.")
+            return
 
         affine_val_labels = ["a", "b", "c", "d", "e", "f"]
 
@@ -96,7 +116,7 @@ class TransformationsFrame(tk.LabelFrame):
 
             row_label = tk.Entry(self.affine_vals_frame, width=8, justify=tk.CENTER)
             row_label.grid(row=row+1, column=0)
-            row_label.insert(0, base_repr(row, base=36))
+            row_label.insert(0, base_repr(row, base=num))
             row_label.config(state=tk.DISABLED, disabledforeground="black")
 
             for col in range(len(affine_val_labels)):
@@ -114,7 +134,7 @@ class TransformationsFrame(tk.LabelFrame):
             p_slash_label.grid(row=row+1, column=len(affine_val_labels)+2)
 
             p_denominator_entry = tk.Entry(self.affine_vals_frame, width=8, justify=tk.LEFT)
-            p_denominator_entry.grid(row=row+1, column=len(affine_val_labels)+2)
+            p_denominator_entry.grid(row=row+1, column=len(affine_val_labels)+3)
 
             row_entries.append(p_denominator_entry)
 
@@ -129,6 +149,7 @@ class TransformationsFrame(tk.LabelFrame):
             try:
                 a, b, c, d, e, f, p_num, p_den = list(map(lambda entry: float(entry.get()), row))
             except ValueError:
+                error_message("There was an error in parsing the IFS code input.")
                 return
 
             transformations.append(AffineTransformation(a, b, c, d, e, f))
@@ -138,33 +159,70 @@ class TransformationsFrame(tk.LabelFrame):
         return IteratedFunctionSystem(transformations), prob_numerators, prob_denominators
 
 
-transformations_frame = TransformationsFrame(root, text="Affine Transformations")
-transformations_frame.grid(row=1, column=1, rowspan=2, pady=(0, 10))
+transformations_frame = TransformationsFrame(root, text="IFS Code")
+transformations_frame.grid(row=1, column=1, rowspan=2)
 
-generator_options = ["Pseudo-random number generator",
-                     "Champernowne's constant",
-                     "Copeland-Erdos constant",
-                     "Composites",
-                     "Biased normal (Champernowne)",
-                     "Biased normal (Copeland-Erdos)",
-                     "Biased normal (Composites)"]
+gen_options_frame = tk.LabelFrame(root, text="Sequence Options")
+gen_options_frame.grid(row=1, column=2, sticky="nsew")
+
+gen_options_frame.grid_rowconfigure(1, weight=1)
+gen_options_frame.grid_rowconfigure(2, weight=1)
+
+generator_options = ["Pseudo-random number generator"]
+generator_options += [tup[0] for tup in example_generators.all_generators]
 
 generator_var = tk.StringVar()
 generator_var.set(generator_options[0])
 
-generator_menu = tk.OptionMenu(root, generator_var, *generator_options)
-generator_menu.config(width=50)
-generator_menu.grid(row=1, column=2)
+generator_menu = tk.OptionMenu(gen_options_frame, generator_var, *generator_options)
+generator_menu.config(width=40)
+generator_menu.grid(row=1, column=1)
+
+use_bias_var = tk.IntVar()
+use_bias_var.set(1)
+
+use_bias_cbox = tk.Checkbutton(gen_options_frame, text="Use Bias", variable=use_bias_var)
+use_bias_cbox.grid(row=2, column=1)
+
+
+def error_message(text):
+    window = tk.Toplevel(root)
+    window.title("Error")
+
+    msg = tk.Label(window, text=text)
+    msg.pack()
+
+    ok_button = tk.Button(window, text="Close", command=window.destroy)
+    ok_button.pack()
+
+    window.mainloop()
+
+
+def generator_selected(*args):
+    if generator_var.get() == "Pseudo-random number generator":
+        use_bias_cbox.config(text="Use Probabilities")
+    else:
+        use_bias_cbox.config(text="Use Bias")
+
+
+generator_var.trace("w", generator_selected)
+generator_var.set("Pseudo-random number generator")
 
 # Drawing Options Frame
-drawing_frame = tk.LabelFrame(root, text="Drawing Options")
-drawing_frame.grid(row=2, column=2)
+drawing_frame = tk.LabelFrame(root, text="Drawing Options", padx=20)
+drawing_frame.grid(row=2, column=2, sticky="nsew")
+
+drawing_frame.grid_columnconfigure(1, weight=1)
+drawing_frame.grid_rowconfigure(1, weight=1)
+
+drawing_frame.grid_columnconfigure(2, weight=1)
+drawing_frame.grid_rowconfigure(2, weight=1)
 
 num_iters_label = tk.Label(drawing_frame, text="Number of iterations:")
-num_iters_label.grid(row=1, column=1)
+num_iters_label.grid(row=1, column=1, sticky="e")
 
 num_iters_entry = tk.Entry(drawing_frame, width=10)
-num_iters_entry.grid(row=1, column=2)
+num_iters_entry.grid(row=1, column=2, sticky="w", padx=(5, 0))
 
 num_iters_entry.insert(0, 100000)
 
@@ -198,25 +256,28 @@ def go_button_pressed():
 
     gen_op = generator_var.get()
 
-    if gen_op == "Champernowne's constant":
-        gen = get_champernowne(ifs.size)
-    elif gen_op == "Copeland-Erdos constant":
-        gen = get_copeland_erdos(ifs.size)
-    elif gen_op == "Composites":
-        gen = get_composites(ifs.size)
-    elif gen_op == "Biased normal (Champernowne)":
-        champ = get_champernowne(lcm(prob_denominators))
-        gen = get_biased(champ, prob_numerators, prob_denominators)
-    elif gen_op == "Biased normal (Copeland-Erdos)":
-        c_e = get_copeland_erdos(lcm(prob_denominators))
-        gen = get_biased(c_e, prob_numerators, prob_denominators)
-    elif gen_op == "Biased normal (Composites)":
-        c_e = get_composites(lcm(prob_denominators))
-        gen = get_biased(c_e, prob_numerators, prob_denominators)
+    if gen_op == "Pseudo-random number generator":
+        if use_bias_var.get() == 0:
+            probs = [1.0 / ifs.size] * ifs.size
+        else:
+            probs = [r / s for r, s in zip(prob_numerators, prob_denominators)]
+        gen = example_generators.get_random_generator(ifs.size, probs)
+    elif use_bias_var.get() == 0:
+        gen = dict(example_generators.all_generators)[gen_op](ifs.size)
+    elif lcm(prob_denominators) > len(digits):
+        error_message("The least common multiple of the probability denominators must not be larger than " + str(len(digits)) + ".")
+        return
     else:
-        gen = get_random_generator(ifs.size, [r / s for r, s in zip(prob_numerators, prob_denominators)])
+        norm_gen = dict(example_generators.all_generators)[gen_op](lcm(prob_denominators))
+        gen = example_generators.get_biased(norm_gen, prob_numerators, prob_denominators)
 
-    img, gen_str = ifs.get_image(IMAGE_WIDTH, IMAGE_HEIGHT, int(num_iters_entry.get()),
+    try:
+        num_iters = int(num_iters_entry.get())
+    except ValueError:
+        error_message("Could not parse " + num_iters_entry.get() + " as a number of iterations.")
+        return
+
+    img, gen_str = ifs.get_image(IMAGE_WIDTH, IMAGE_HEIGHT, num_iters,
                                  gen, colors=show_colors_var.get() == 1, first_transformations=100)
 
     first_transformations_label.config(state=tk.NORMAL)
@@ -235,41 +296,72 @@ go_button.config(command=go_button_pressed)
 def save_image():
     filename = tk.filedialog.asksaveasfilename(title="Save Image", filetypes=(("png files", "*.png"),))
 
+    if filename == "":
+        return
+
     if filename[:-4] != ".png":
         filename += ".png"
 
     fractal_label.image.write(filename, format="png")
 
 
+def export_ifs():
+    filename = tk.filedialog.asksaveasfilename(title="Export IFS Code", filetypes=(("csv files", "*.csv"),))
+
+    if filename == "":
+        return
+
+    if not filename.endswith(".csv"):
+        filename += ".csv"
+
+    ifs, prob_numerators, prob_denominators = transformations_frame.get_ifs()
+
+    examples.ifs_to_csv(filename, ifs, prob_numerators, prob_denominators)
+
+    populate_examples(examples_menu, True)
+
+
 # Menu GUI
 menu_bar = tk.Menu(root)
 
 file_menu = tk.Menu(menu_bar, tearoff=0)
+
+file_menu.add_command(label="Export IFS Code", command=export_ifs)
 file_menu.add_command(label="Save Image", command=save_image)
 menu_bar.add_cascade(label="File", menu=file_menu)
 
 examples_menu = tk.Menu(menu_bar, tearoff=0)
 
-for ex in examples.all_examples:
-    def load_example(example=ex):
-        transformations_frame.num_selector_entry.delete(0, tk.END)
-        transformations_frame.num_selector_entry.insert(0, example.ifs.size)
-        transformations_frame.num_selected()
 
-        for i in range(example.ifs.size):
-            row = transformations_frame.transformation_entries[i]
+def populate_examples(menu, clear):
+    ifs_examples = examples.load_all_examples()
 
-            row[0].insert(0, example.ifs.transformations[i].a)
-            row[1].insert(0, example.ifs.transformations[i].b)
-            row[2].insert(0, example.ifs.transformations[i].c)
-            row[3].insert(0, example.ifs.transformations[i].d)
-            row[4].insert(0, example.ifs.transformations[i].e)
-            row[5].insert(0, example.ifs.transformations[i].f)
+    if clear:
+        menu.delete(0, len(ifs_examples) - 1)
 
-            row[6].insert(0, example.prob_numerators[i])
-            row[7].insert(0, example.prob_denominators[i])
+    for ex in ifs_examples:
+        def load_example(example=ex):
+            transformations_frame.num_selector_entry.delete(0, tk.END)
+            transformations_frame.num_selector_entry.insert(0, example.ifs.size)
+            transformations_frame.num_selected()
 
-    examples_menu.add_command(label=ex.name, command=load_example)
+            for i in range(example.ifs.size):
+                row = transformations_frame.transformation_entries[i]
+
+                row[0].insert(0, example.ifs.transformations[i].a)
+                row[1].insert(0, example.ifs.transformations[i].b)
+                row[2].insert(0, example.ifs.transformations[i].c)
+                row[3].insert(0, example.ifs.transformations[i].d)
+                row[4].insert(0, example.ifs.transformations[i].e)
+                row[5].insert(0, example.ifs.transformations[i].f)
+
+                row[6].insert(0, example.prob_numerators[i])
+                row[7].insert(0, example.prob_denominators[i])
+
+        menu.add_command(label=ex.name, command=load_example)
+
+
+populate_examples(examples_menu, False)
 
 menu_bar.add_cascade(label="Examples", menu=examples_menu)
 

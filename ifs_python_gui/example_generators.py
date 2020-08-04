@@ -1,11 +1,12 @@
 import random
 
+digits = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyzαβγδεζηθι!@#$%^&*()`~,./<>?;\':\"[]{}+\\|'
+
 
 # Copied from numpy source code: https://numpy.org/doc/stable/reference/generated/numpy.base_repr.html
 def base_repr(number, base=2, padding=0):
-    digits = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ'
     if base > len(digits):
-        raise ValueError("Bases greater than 36 not handled in base_repr.")
+        raise ValueError("Bases greater than 100 not handled in base_repr.")
     elif base < 2:
         raise ValueError("Bases less than 2 not handled in base_repr.")
 
@@ -19,6 +20,84 @@ def base_repr(number, base=2, padding=0):
     if number < 0:
         res.append('-')
     return ''.join(reversed(res or '0'))
+
+
+python_int = int
+
+
+def int(x, base=10):
+    if type(x) != str:
+        return python_int(x)
+
+    if base <= 36 or base > len(digits) or len(x) == 0:
+        return python_int(x, base=base)
+
+    if x[0] == "-":
+        return -int(x[1:], base=base)
+
+    num = 0
+    for i in range(len(x)):
+        num += digits.index(x[i]) * (base ** (len(x) - i - 1))
+
+    return num
+
+
+def concat_generator(generator):
+    while True:
+        current_value = next(generator)
+
+        for digit in str(current_value):
+            yield digit
+
+
+def get_champernowne(base):
+    def counter_generator():
+        counter = 0
+        while True:
+            yield base_repr(counter, base=base)
+            counter += 1
+    return concat_generator(counter_generator())
+
+
+def get_besicovitch(base):
+    def square_generator():
+        counter = 1
+        while True:
+            yield base_repr(counter * counter, base=base)
+            counter += 1
+    return concat_generator(square_generator())
+
+
+def get_copeland_erdos(base):
+    def prime_generator_slow():
+        yield "2"
+
+        counter = 3
+
+        while True:
+            if is_prime(counter):
+                yield base_repr(counter, base=base)
+            counter += 2
+
+    # Adapted from http://code.activestate.com/recipes/117119-sieve-of-eratosthenes/#c4
+    def prime_generator():
+        yield base_repr(2, base=base)
+        D = {}
+        q = 3
+
+        while True:
+            p = D.pop(q, 0)
+            if p:
+                x = q + p
+                while x in D:
+                    x += p
+                D[x] = p
+            else:
+                yield base_repr(q, base=base)
+                D[q * q] = 2 * q
+            q += 2
+
+    return concat_generator(prime_generator())
 
 
 def get_random_generator(base, probs):
@@ -40,24 +119,6 @@ def get_random_generator(base, probs):
     return random_generator()
 
 
-def get_champernowne(base):
-    def champernowne_generator():
-        counter = 0
-        string_index = 0
-        counter_string = base_repr(counter, base=base)
-        while True:
-            if string_index >= len(counter_string):
-                counter += 1
-                string_index = 0
-                counter_string = base_repr(counter, base=base)
-
-            yield counter_string[string_index]
-
-            string_index += 1
-
-    return champernowne_generator()
-
-
 def lcm(array):
     largest = max(array)
     m = max(array)
@@ -67,7 +128,7 @@ def lcm(array):
 
 
 def get_biased(normal_number, numerators, denominators):
-    n = len(numerators)
+    n = len(denominators)
     d = lcm(denominators)
     g = ""
     for i in range(n):
@@ -89,45 +150,6 @@ def is_prime(n):
     return True
 
 
-def get_copeland_erdos(base):
-    def c_e_generator():
-        counter = 2
-        string_index = 0
-        counter_string = base_repr(counter, base=base)
-        while True:
-            if string_index >= len(counter_string):
-                counter += 1
-
-                while not is_prime(counter):
-                    counter += 1
-
-                string_index = 0
-                counter_string = base_repr(counter, base=base)
-
-            yield counter_string[string_index]
-
-            string_index += 1
-
-    return c_e_generator()
-
-
-def get_composites(base):
-    def c_e_generator():
-        counter = 2
-        string_index = 0
-        counter_string = base_repr(counter, base=base)
-        while True:
-            if string_index >= len(counter_string):
-                counter += 1
-
-                while is_prime(counter):
-                    counter += 1
-
-                string_index = 0
-                counter_string = base_repr(counter, base=base)
-
-            yield counter_string[string_index]
-
-            string_index += 1
-
-    return c_e_generator()
+all_generators = [("Champernowne's constant", get_champernowne),
+                  ("Copeland-Erdos constant", get_copeland_erdos),
+                  ("Besicovitch's sequence", get_besicovitch)]
