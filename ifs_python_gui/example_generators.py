@@ -70,7 +70,7 @@ def get_besicovitch(base):
 
 def get_copeland_erdos(base):
     def prime_generator_slow():
-        yield "2"
+        yield base_repr(2, base=base)
 
         counter = 3
 
